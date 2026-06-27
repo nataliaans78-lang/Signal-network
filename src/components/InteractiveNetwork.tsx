@@ -1,6 +1,7 @@
 import {
   useEffect,
   useRef,
+  useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
@@ -12,6 +13,16 @@ type NetworkNode = {
   vx: number;
   vy: number;
   radius: number;
+};
+
+type Point = {
+  x: number;
+  y: number;
+};
+
+type GeneratedConcept = {
+  title: string;
+  description: string;
 };
 
 const NODE_LABELS = [
@@ -28,17 +39,173 @@ const NODE_LABELS = [
 
 const CONNECTION_DISTANCE = 230;
 const CANVAS_MARGIN = 50;
+const CLICK_DISTANCE = 8;
+const MAX_SELECTED_NODES = 3;
+
+const CONCEPTS: Record<string, GeneratedConcept> = {
+  "Brand|Motion": {
+    title: "Kinetic Identity",
+    description:
+      "A dynamic brand system designed to evolve through movement and interaction.",
+  },
+
+  "Brand|Typography": {
+    title: "Visual Language System",
+    description:
+      "A flexible identity built through expressive typography and consistent brand principles.",
+  },
+
+  "AI|Strategy": {
+    title: "Adaptive Brand System",
+    description:
+      "A strategic identity capable of responding to changing audiences, contexts and data.",
+  },
+
+  "Development|Web": {
+    title: "Digital Product Engine",
+    description:
+      "A scalable digital platform combining thoughtful interaction with reliable technology.",
+  },
+
+  "3D|Motion": {
+    title: "Spatial Motion Study",
+    description:
+      "An experiment exploring movement, depth and visual storytelling in digital space.",
+  },
+
+  "Motion|Web": {
+    title: "Kinetic Web Experience",
+    description:
+      "An interactive web experience shaped through responsive motion, transitions and user interaction.",
+  },
+
+  "Sound|Typography": {
+    title: "Sonic Editorial System",
+    description:
+      "A visual language where rhythm, sound and typography work as one expressive system.",
+  },
+
+  "3D|Sound|Web": {
+    title: "Immersive Digital Space",
+    description:
+      "An interactive environment combining spatial visuals, sound and web technology.",
+  },
+
+  "AI|Development|Web": {
+    title: "Intelligent Interface",
+    description:
+      "A responsive digital experience shaped by artificial intelligence and real-time interaction.",
+  },
+
+  "Brand|Strategy|Typography": {
+    title: "Brand Language System",
+    description:
+      "A coherent identity connecting positioning, visual expression and typographic structure.",
+  },
+
+  "Motion|Sound|Web": {
+    title: "Responsive Media Experience",
+    description:
+      "A digital experience that reacts through movement, sound and user interaction.",
+  },
+};
 
 export default function InteractiveNetwork() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const nodesRef = useRef<NetworkNode[]>([]);
+
   const draggedNodeRef = useRef<NetworkNode | null>(null);
   const hoveredNodeRef = useRef<NetworkNode | null>(null);
+
+  const pointerStartRef = useRef<{
+    x: number;
+    y: number;
+    nodeId: number;
+  } | null>(null);
+
+  const selectedIdsRef = useRef<number[]>([]);
 
   const sizeRef = useRef({
     width: 0,
     height: 0,
   });
+
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [generatedConcept, setGeneratedConcept] =
+    useState<GeneratedConcept | null>(null);
+
+  const selectedLabels = selectedIds.map((id) => NODE_LABELS[id]);
+
+  const toggleNodeSelection = (nodeId: number) => {
+    setSelectedIds((currentIds) => {
+      let nextIds: number[];
+
+      if (currentIds.includes(nodeId)) {
+        nextIds = currentIds.filter((id) => id !== nodeId);
+      } else if (currentIds.length < MAX_SELECTED_NODES) {
+        nextIds = [...currentIds, nodeId];
+      } else {
+        return currentIds;
+      }
+
+      selectedIdsRef.current = nextIds;
+
+      return nextIds;
+    });
+
+    setGeneratedConcept(null);
+  };
+
+  const clearSelection = () => {
+    selectedIdsRef.current = [];
+    setSelectedIds([]);
+    setGeneratedConcept(null);
+  };
+
+  const generateConnection = () => {
+    if (selectedIds.length < 2) {
+      return;
+    }
+
+    const labels = selectedIds.map((id) => NODE_LABELS[id]);
+    const conceptKey = [...labels].sort().join("|");
+
+    const existingConcept = CONCEPTS[conceptKey];
+
+    if (existingConcept) {
+      setGeneratedConcept(existingConcept);
+      return;
+    }
+
+    const seed = selectedIds.reduce((sum, id) => sum + id, 0);
+
+    const prefixes = [
+      "Connected",
+      "Adaptive",
+      "Dynamic",
+      "Hybrid",
+      "Responsive",
+    ];
+
+    const subjects = [
+      "Creative System",
+      "Digital Experience",
+      "Visual Platform",
+      "Interaction Framework",
+      "Communication Space",
+    ];
+
+    const title = `${prefixes[seed % prefixes.length]} ${
+      subjects[(seed + labels.length) % subjects.length]
+    }`;
+
+    setGeneratedConcept({
+      title,
+      description: `A creative direction combining ${labels.join(
+        ", ",
+      )} into one connected and interactive system.`,
+    });
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -58,28 +225,28 @@ export default function InteractiveNetwork() {
       const centerY = height / 2;
 
       const orbitRadius = Math.min(width, height) * 0.38;
+      const randomOffset = Math.min(width, height) * 0.08;
 
       nodesRef.current = NODE_LABELS.map((label, index) => {
-        const baseAngle = (Math.PI * 2 * index) / NODE_LABELS.length;
-        const angle = baseAngle + (Math.random() - 0.5) * 0.22;
-        const nodeOrbitRadius = orbitRadius * (0.82 + Math.random() * 0.18);
-        const randomOffset = Math.min(width, height) * 0.04;
-        const movementAngle = Math.random() * Math.PI * 2;
-        const movementSpeed = 0.2 + Math.random() * 0.12;
+        const angle = (Math.PI * 2 * index) / NODE_LABELS.length;
 
         return {
           id: index,
           label,
+
           x:
             centerX +
-            Math.cos(angle) * nodeOrbitRadius +
+            Math.cos(angle) * orbitRadius +
             (Math.random() - 0.5) * randomOffset,
+
           y:
             centerY +
-            Math.sin(angle) * nodeOrbitRadius +
+            Math.sin(angle) * orbitRadius +
             (Math.random() - 0.5) * randomOffset,
-          vx: Math.cos(movementAngle) * movementSpeed,
-          vy: Math.sin(movementAngle) * movementSpeed,
+
+          vx: (Math.random() - 0.5) * 0.55,
+          vy: (Math.random() - 0.5) * 0.55,
+
           radius: index === 0 ? 9 : 7,
         };
       });
@@ -130,114 +297,6 @@ export default function InteractiveNetwork() {
     resizeObserver.observe(canvas);
     resizeCanvas();
 
-    let animationFrameId = 0;
-
-    const drawConnections = (nodes: NetworkNode[]) => {
-      for (
-        let firstIndex = 0;
-        firstIndex < nodes.length;
-        firstIndex += 1
-      ) {
-        for (
-          let secondIndex = firstIndex + 1;
-          secondIndex < nodes.length;
-          secondIndex += 1
-        ) {
-          const firstNode = nodes[firstIndex];
-          const secondNode = nodes[secondIndex];
-
-          const deltaX = secondNode.x - firstNode.x;
-          const deltaY = secondNode.y - firstNode.y;
-
-          const distance = Math.hypot(deltaX, deltaY);
-
-          if (distance > CONNECTION_DISTANCE) {
-            continue;
-          }
-
-          const strength = 1 - distance / CONNECTION_DISTANCE;
-
-          context.beginPath();
-          context.moveTo(firstNode.x, firstNode.y);
-          context.lineTo(secondNode.x, secondNode.y);
-
-          context.strokeStyle = `rgba(
-            255,
-            255,
-            255,
-            ${strength * 0.56}
-          )`;
-
-          context.lineWidth = 1;
-          context.stroke();
-        }
-      }
-    };
-
-    const drawNodes = (nodes: NetworkNode[]) => {
-      for (const node of nodes) {
-        const isDragged = draggedNodeRef.current === node;
-        const isHovered = hoveredNodeRef.current === node;
-        const interactionScale = isDragged ? 3 : isHovered ? 2 : 0;
-
-        context.beginPath();
-
-        context.arc(
-          node.x,
-          node.y,
-          node.radius + interactionScale,
-          0,
-          Math.PI * 2,
-        );
-
-        context.fillStyle = isDragged
-          ? "rgba(255, 255, 255, 1)"
-          : isHovered
-            ? "rgba(255, 255, 255, 0.96)"
-          : "rgba(255, 255, 255, 0.82)";
-
-        context.shadowColor = "rgba(255, 255, 255, 0.45)";
-        context.shadowBlur = isDragged ? 16 : isHovered ? 12 : 0;
-        context.fill();
-        context.shadowBlur = 0;
-
-        context.beginPath();
-
-        context.arc(
-          node.x,
-          node.y,
-          node.radius + (isDragged || isHovered ? 16 : 13),
-          0,
-          Math.PI * 2,
-        );
-
-        context.strokeStyle = isDragged
-          ? "rgba(255, 255, 255, 0.5)"
-          : isHovered
-            ? "rgba(255, 255, 255, 0.38)"
-          : "rgba(255, 255, 255, 0.13)";
-
-        context.lineWidth = 1;
-        context.stroke();
-
-        context.font = "500 12px Arial, sans-serif";
-        context.textAlign = "center";
-        context.textBaseline = "top";
-
-        context.fillStyle = isDragged
-          ? "rgba(255, 255, 255, 1)"
-          : isHovered
-            ? "rgba(255, 255, 255, 0.96)"
-            : "rgba(255, 255, 255, 0.84)";
-
-        context.fillText(
-          node.label,
-          node.x,
-          node.y + node.radius + 18,
-        );
-      }
-    };
-
     const updateNodes = (nodes: NetworkNode[]) => {
       const { width, height } = sizeRef.current;
 
@@ -273,7 +332,150 @@ export default function InteractiveNetwork() {
       }
     };
 
-    const animate = () => {
+    const drawConnections = (nodes: NetworkNode[]) => {
+      const selectedNodes = new Set(selectedIdsRef.current);
+
+      for (
+        let firstIndex = 0;
+        firstIndex < nodes.length;
+        firstIndex += 1
+      ) {
+        for (
+          let secondIndex = firstIndex + 1;
+          secondIndex < nodes.length;
+          secondIndex += 1
+        ) {
+          const firstNode = nodes[firstIndex];
+          const secondNode = nodes[secondIndex];
+
+          const deltaX = secondNode.x - firstNode.x;
+          const deltaY = secondNode.y - firstNode.y;
+
+          const distance = Math.hypot(deltaX, deltaY);
+
+          const isSelectedConnection =
+            selectedNodes.has(firstNode.id) &&
+            selectedNodes.has(secondNode.id);
+
+          if (
+            !isSelectedConnection &&
+            distance > CONNECTION_DISTANCE
+          ) {
+            continue;
+          }
+
+          context.beginPath();
+          context.moveTo(firstNode.x, firstNode.y);
+          context.lineTo(secondNode.x, secondNode.y);
+
+          if (isSelectedConnection) {
+            context.strokeStyle = "rgba(255, 255, 255, 0.88)";
+            context.lineWidth = 1.6;
+          } else {
+            const strength =
+              1 - distance / CONNECTION_DISTANCE;
+
+            context.strokeStyle = `rgba(
+              255,
+              255,
+              255,
+              ${Math.max(0, strength) * 0.5}
+            )`;
+
+            context.lineWidth = 1;
+          }
+
+          context.stroke();
+        }
+      }
+    };
+
+    const drawNodes = (nodes: NetworkNode[], time: number) => {
+      const selectedNodes = new Set(selectedIdsRef.current);
+
+      for (const node of nodes) {
+        const isDragged = draggedNodeRef.current === node;
+        const isHovered = hoveredNodeRef.current === node;
+        const isSelected = selectedNodes.has(node.id);
+
+        const pulse =
+          1 + Math.sin(time * 0.004 + node.id) * 0.08;
+
+        if (isSelected) {
+          context.beginPath();
+
+          context.arc(
+            node.x,
+            node.y,
+            (node.radius + 18) * pulse,
+            0,
+            Math.PI * 2,
+          );
+
+          context.strokeStyle = "rgba(255, 255, 255, 0.28)";
+          context.lineWidth = 1;
+          context.stroke();
+        }
+
+        context.beginPath();
+
+        context.arc(
+          node.x,
+          node.y,
+          isDragged || isSelected
+            ? node.radius + 3
+            : node.radius,
+          0,
+          Math.PI * 2,
+        );
+
+        context.fillStyle =
+          isSelected || isDragged
+            ? "rgba(255, 255, 255, 1)"
+            : "rgba(255, 255, 255, 0.82)";
+
+        context.fill();
+
+        context.beginPath();
+
+        context.arc(
+          node.x,
+          node.y,
+          node.radius + 13,
+          0,
+          Math.PI * 2,
+        );
+
+        context.strokeStyle =
+          isSelected || isDragged
+            ? "rgba(255, 255, 255, 0.7)"
+            : isHovered
+              ? "rgba(255, 255, 255, 0.4)"
+              : "rgba(255, 255, 255, 0.13)";
+
+        context.lineWidth = 1;
+        context.stroke();
+
+        context.font = "500 12px Arial, sans-serif";
+        context.textAlign = "center";
+        context.textBaseline = "top";
+
+        context.fillStyle =
+          isSelected || isHovered
+            ? "rgba(255, 255, 255, 1)"
+            : "rgba(255, 255, 255, 0.78)";
+
+        context.fillText(
+          node.label,
+          node.x,
+          node.y + node.radius + 18,
+        );
+      }
+    };
+
+    let animationFrameId = 0;
+
+    const animate = (time: number) => {
       const { width, height } = sizeRef.current;
       const nodes = nodesRef.current;
 
@@ -281,12 +483,13 @@ export default function InteractiveNetwork() {
 
       updateNodes(nodes);
       drawConnections(nodes);
-      drawNodes(nodes);
+      drawNodes(nodes, time);
 
-      animationFrameId = window.requestAnimationFrame(animate);
+      animationFrameId =
+        window.requestAnimationFrame(animate);
     };
 
-    animate();
+    animationFrameId = window.requestAnimationFrame(animate);
 
     return () => {
       resizeObserver.disconnect();
@@ -296,7 +499,7 @@ export default function InteractiveNetwork() {
 
   const getPointerPosition = (
     event: ReactPointerEvent<HTMLCanvasElement>,
-  ) => {
+  ): Point => {
     const rectangle = event.currentTarget.getBoundingClientRect();
 
     return {
@@ -305,44 +508,36 @@ export default function InteractiveNetwork() {
     };
   };
 
-  const findNodeAt = (
-    pointer: { x: number; y: number },
-    hitArea: number,
-  ) =>
-    [...nodesRef.current].reverse().find((node) => {
-      const distance = Math.hypot(
-        pointer.x - node.x,
-        pointer.y - node.y,
-      );
+  const findNodeAtPosition = (position: Point) => {
+    return [...nodesRef.current]
+      .reverse()
+      .find((node) => {
+        const distance = Math.hypot(
+          position.x - node.x,
+          position.y - node.y,
+        );
 
-      return distance <= node.radius + hitArea;
-    });
+        return distance <= node.radius + 22;
+      });
+  };
 
   const handlePointerDown = (
     event: ReactPointerEvent<HTMLCanvasElement>,
   ) => {
-    event.preventDefault();
-
     const pointer = getPointerPosition(event);
-    const selectedNode = findNodeAt(pointer, 22);
+    const selectedNode = findNodeAtPosition(pointer);
 
     if (!selectedNode) {
       return;
     }
 
     draggedNodeRef.current = selectedNode;
-    hoveredNodeRef.current = selectedNode;
 
-    const { width, height } = sizeRef.current;
-
-    selectedNode.x = Math.min(
-      Math.max(pointer.x, CANVAS_MARGIN),
-      width - CANVAS_MARGIN,
-    );
-    selectedNode.y = Math.min(
-      Math.max(pointer.y, CANVAS_MARGIN),
-      height - CANVAS_MARGIN,
-    );
+    pointerStartRef.current = {
+      x: pointer.x,
+      y: pointer.y,
+      nodeId: selectedNode.id,
+    };
 
     event.currentTarget.setPointerCapture(event.pointerId);
     event.currentTarget.style.cursor = "grabbing";
@@ -351,22 +546,21 @@ export default function InteractiveNetwork() {
   const handlePointerMove = (
     event: ReactPointerEvent<HTMLCanvasElement>,
   ) => {
+    const pointer = getPointerPosition(event);
     const draggedNode = draggedNodeRef.current;
 
     if (!draggedNode) {
-      if (event.pointerType === "mouse") {
-        const hoveredNode = findNodeAt(getPointerPosition(event), 13);
+      const hoveredNode = findNodeAtPosition(pointer);
 
-        hoveredNodeRef.current = hoveredNode ?? null;
-        event.currentTarget.style.cursor = hoveredNode ? "pointer" : "grab";
-      }
+      hoveredNodeRef.current = hoveredNode ?? null;
+
+      event.currentTarget.style.cursor = hoveredNode
+        ? "pointer"
+        : "default";
 
       return;
     }
 
-    event.preventDefault();
-
-    const pointer = getPointerPosition(event);
     const { width, height } = sizeRef.current;
 
     draggedNode.x = Math.min(
@@ -383,27 +577,61 @@ export default function InteractiveNetwork() {
   const handlePointerUp = (
     event: ReactPointerEvent<HTMLCanvasElement>,
   ) => {
-    draggedNodeRef.current = null;
+    const pointer = getPointerPosition(event);
 
-    if (event.pointerType !== "mouse") {
-      hoveredNodeRef.current = null;
+    const draggedNode = draggedNodeRef.current;
+    const pointerStart = pointerStartRef.current;
+
+    if (draggedNode && pointerStart) {
+      const pointerMovement = Math.hypot(
+        pointer.x - pointerStart.x,
+        pointer.y - pointerStart.y,
+      );
+
+      if (
+        pointerMovement <= CLICK_DISTANCE &&
+        pointerStart.nodeId === draggedNode.id
+      ) {
+        toggleNodeSelection(draggedNode.id);
+      }
     }
+
+    draggedNodeRef.current = null;
+    pointerStartRef.current = null;
+
+    const hoveredNode = findNodeAtPosition(pointer);
+    hoveredNodeRef.current = hoveredNode ?? null;
+
+    event.currentTarget.style.cursor = hoveredNode
+      ? "pointer"
+      : "default";
 
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-
-    event.currentTarget.style.cursor = "grab";
   };
 
-  const handlePointerLeave = () => {
-    if (!draggedNodeRef.current) {
-      hoveredNodeRef.current = null;
+  const handlePointerCancel = (
+    event: ReactPointerEvent<HTMLCanvasElement>,
+  ) => {
+    draggedNodeRef.current = null;
+    pointerStartRef.current = null;
+    hoveredNodeRef.current = null;
+
+    event.currentTarget.style.cursor = "default";
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
     }
   };
 
-  const handleLostPointerCapture = () => {
-    draggedNodeRef.current = null;
+  const handlePointerLeave = (
+    event: ReactPointerEvent<HTMLCanvasElement>,
+  ) => {
+    if (!draggedNodeRef.current) {
+      hoveredNodeRef.current = null;
+      event.currentTarget.style.cursor = "default";
+    }
   };
 
   return (
@@ -420,21 +648,89 @@ export default function InteractiveNetwork() {
       </header>
 
       <div className="network-container">
-        <canvas
-          ref={canvasRef}
-          className="network-canvas"
-          aria-label="Interactive network of creative disciplines"
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-          onPointerLeave={handlePointerLeave}
-          onLostPointerCapture={handleLostPointerCapture}
-        />
+        <div className="network-stage">
+          <canvas
+            ref={canvasRef}
+            className="network-canvas"
+            aria-label="Interactive network of creative disciplines"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+            onPointerLeave={handlePointerLeave}
+          />
 
-        <p className="network-hint">
-          Drag the nodes to reshape the network
-        </p>
+          <p className="network-hint">
+            Drag to move · Click to select
+          </p>
+        </div>
+
+        <div className="network-panel">
+          <div className="network-selection">
+            <span className="network-panel-label">
+              Selected disciplines
+            </span>
+
+            <div className="network-chips">
+              {selectedIds.length === 0 ? (
+                <span className="network-empty">
+                  Select two or three nodes
+                </span>
+              ) : (
+                selectedIds.map((id) => (
+                  <button
+                    key={id}
+                    type="button"
+                    className="network-chip"
+                    onClick={() => toggleNodeSelection(id)}
+                  >
+                    {NODE_LABELS[id]}
+                    <span aria-hidden="true">×</span>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="network-actions">
+            <button
+              type="button"
+              className="network-generate"
+              disabled={selectedIds.length < 2}
+              onClick={generateConnection}
+            >
+              Generate connection
+            </button>
+
+            <button
+              type="button"
+              className="network-clear"
+              disabled={selectedIds.length === 0}
+              onClick={clearSelection}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
+        {generatedConcept && (
+          <div className="network-result">
+            <div>
+              <span className="network-result-label">
+                Generated connection
+              </span>
+
+              <p className="network-result-combination">
+                {selectedLabels.join(" + ")}
+              </p>
+            </div>
+
+            <div>
+              <h2>{generatedConcept.title}</h2>
+              <p>{generatedConcept.description}</p>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );
